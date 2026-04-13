@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bangkok Orchid Financial Dashboard</title>
+    <title>Bangkok Orchid - แดชบอร์ดวิเคราะห์งบการเงิน</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
@@ -19,21 +19,27 @@
             <div class="brand">
                 <i class="fa-solid fa-leaf"></i>
                 <h2>Bangkok Orchid</h2>
-                <span>Financial Intelligence</span>
+                <span>ระบบวิเคราะห์การเงิน</span>
             </div>
             
             <ul class="nav-links">
-                <li class="active" data-tab="overview"><i class="fa-solid fa-chart-pie"></i> Executive Overview</li>
-                <li data-tab="pnl"><i class="fa-solid fa-file-invoice-dollar"></i> P&L Analysis</li>
-                <li data-tab="menu"><i class="fa-solid fa-utensils"></i> Menu Performance</li>
-                <li data-tab="insights"><i class="fa-solid fa-brain"></i> AI Analyst Insights</li>
+                <li class="active" data-tab="overview"><i class="fa-solid fa-chart-pie"></i> ภาพรวมผู้บริหาร</li>
+                <li data-tab="pnl"><i class="fa-solid fa-file-invoice-dollar"></i> วิเคราะห์ผลกำไร (P&L)</li>
+                <li data-tab="menu"><i class="fa-solid fa-utensils"></i> ความนิยมเมนู (ยอดขาย)</li>
+                <li data-tab="insights"><i class="fa-solid fa-brain"></i> วิเคราะห์เจาะลึก (AI Insight)</li>
             </ul>
 
             <div class="sidebar-footer">
+                <p><strong>ลิงก์ข้อมูลอ้างอิง:</strong></p>
+                <a href="https://docs.google.com/spreadsheets/d/1S6Rv6jRLQjlZBlAWYHswZJ8Qiva8mKW5W2Sio-sOorU/edit" target="_blank">
+                    <i class="fa-solid fa-file-excel"></i> ฐานข้อมูล P&L
+                </a>
+                <a href="https://docs.google.com/spreadsheets/d/1SaquMteqaEb9-cru1mqLVYYpwP5Guy9BS8hw9MlZt1s/edit#gid=1029789096" target="_blank">
+                    <i class="fa-solid fa-file-excel"></i> ฐานข้อมูลเมนูยอดฮิต
+                </a>
                 <a href="https://github.com/Nae0000/bangkokorchidfin" target="_blank">
                     <i class="fa-brands fa-github"></i> Repository
                 </a>
-                <p>Live Sheets Connection</p>
             </div>
         </nav>
 
@@ -41,18 +47,26 @@
         <main class="main-content">
             <header class="top-bar">
                 <div class="page-title">
-                    <h1 id="current-tab-title">Executive Overview</h1>
-                    <p id="current-tab-desc">High-level financial performance and KPIs</p>
+                    <h1 id="current-tab-title">ภาพรวมผู้บริหาร</h1>
+                    <p id="current-tab-desc">ดัชนีชี้วัดผลงานทางการเงิน (KPIs) และแนวโน้มปัจจุบัน</p>
                 </div>
                 <div class="actions">
-                    <div class="last-updated">Status: <span class="badge success" id="data-status">Connected</span></div>
-                    <button id="refresh-btn" class="btn-primary"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    <select id="year-filter" class="form-select">
+                        <option value="all">ดูข้อมูลทุกปี (All Years)</option>
+                        <option value="2022">ปี 2022</option>
+                        <option value="2023">ปี 2023</option>
+                        <option value="2024">ปี 2024</option>
+                        <option value="2025">ปี 2025</option>
+                        <option value="2026">ปี 2026</option>
+                    </select>
+                    <div class="last-updated">สถานะ: <span class="badge success" id="data-status">เชื่อมต่อเรียบร้อย</span></div>
+                    <button id="refresh-btn" class="btn-primary"><i class="fa-solid fa-rotate-right"></i> โหลดข้อมูลใหม่</button>
                 </div>
             </header>
 
             <div class="loader-container" id="global-loader">
                 <div class="spinner"></div>
-                <p>Analyzing Google Sheets Data...</p>
+                <p>กำลังดึงข้อมูลและวิเคราะห์จาก Google Sheets...</p>
             </div>
 
             <!-- Tab Content: Overview -->
@@ -61,46 +75,46 @@
                     <div class="kpi-card">
                         <div class="kpi-icon revenue"><i class="fa-solid fa-wallet"></i></div>
                         <div class="kpi-info">
-                            <h3>Avg MoM Revenue</h3>
+                            <h3>รายได้เฉลี่ยต่อเดือน</h3>
                             <h2 id="kpi-revenue">¥ 0</h2>
-                            <p class="trend positive" id="kpi-revenue-trend"><i class="fa-solid fa-arrow-trend-up"></i> +0% Since 2022</p>
+                            <p class="trend positive" id="kpi-revenue-trend"><i class="fa-solid fa-arrow-trend-up"></i> +0% (ภาพรวม)</p>
                         </div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-icon profit"><i class="fa-solid fa-chart-line"></i></div>
                         <div class="kpi-info">
-                            <h3>Avg Operating Margin</h3>
+                            <h3>อัตรากำไรจากการดำเนินงาน</h3>
                             <h2 id="kpi-margin">0%</h2>
-                            <p class="trend" id="kpi-margin-trend">Stable</p>
+                            <p class="trend" id="kpi-margin-trend">เปรียบเทียบจากรายได้</p>
                         </div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-icon cost"><i class="fa-solid fa-basket-shopping"></i></div>
                         <div class="kpi-info">
-                            <h3>Current Food Cost</h3>
+                            <h3>สัดส่วนค่าวัตถุดิบ (Food Cost)</h3>
                             <h2 id="kpi-foodcost">0%</h2>
-                            <p class="trend negative" id="kpi-foodcost-trend">Target: 30-35%</p>
+                            <p class="trend negative" id="kpi-foodcost-trend">เป้าหมายมาตรฐานไม่เกิน 30-35%</p>
                         </div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-icon channel"><i class="fa-solid fa-motorcycle"></i></div>
                         <div class="kpi-info">
-                            <h3>Takeout / Uber Share</h3>
+                            <h3>สัดส่วนยอด Delivery/Takeout</h3>
                             <h2 id="kpi-delivery">0%</h2>
-                            <p class="trend positive" id="kpi-delivery-trend">Of Total Rev</p>
+                            <p class="trend positive" id="kpi-delivery-trend">จากรายได้ทั้งหมด</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="charts-grid-2">
                     <div class="chart-card">
-                        <h3>Operating Revenue Trend</h3>
+                        <h3>แนวโน้มรายได้และการเติบโต (Revenue Growth)</h3>
                         <div class="canvas-container">
                             <canvas id="revenueTrendChart"></canvas>
                         </div>
                     </div>
                     <div class="chart-card">
-                        <h3>Revenue by Channel</h3>
+                        <h3>สัดส่วนรายได้แยกตามช่องทาง (Channel Mix)</h3>
                         <div class="canvas-container">
                             <canvas id="channelMixChart"></canvas>
                         </div>
@@ -112,25 +126,25 @@
             <section id="pnl-tab" class="tab-pane">
                 <div class="charts-grid-2">
                     <div class="chart-card span-2">
-                        <h3>Profitability & Margin Analysis (Monthly)</h3>
+                        <h3>วิเคราะห์ผลกำไรขั้นต้น และต้นทุน (Profitability & Margin)</h3>
                         <div class="canvas-container large">
                             <canvas id="marginAnalysisChart"></canvas>
                         </div>
                     </div>
                     <div class="chart-card">
-                        <h3>Average Expenses Structure</h3>
+                        <h3>โครงสร้างค่าใช้จ่าย (OpEx Breakdown)</h3>
                         <div class="canvas-container">
                             <canvas id="expenseStructureChart"></canvas>
                         </div>
                     </div>
                     <div class="chart-card text-analysis">
-                        <h3>Highest Expense Alert</h3>
+                        <h3>ภาพรวมการควบคุมต้นทุน (Cost Control Alert)</h3>
                         <div class="analysis-content" id="cost-analysis-text">
                             <div class="insight-item warning">
                                 <i class="fa-solid fa-triangle-exclamation"></i>
                                 <div>
-                                    <h4>Personnel Costs Volatility</h4>
-                                    <p>Labor costs show high volatility historically.</p>
+                                    <h4>กำลังประมวลผล...</h4>
+                                    <p>รอการเชื่อมต่อข้อมูลรายเดือน</p>
                                 </div>
                             </div>
                         </div>
@@ -142,20 +156,20 @@
             <section id="menu-tab" class="tab-pane">
                 <div class="kpi-grid">
                     <div class="kpi-card highlight">
-                        <h3>Consistent Top Performer</h3>
-                        <h2 id="top-menu-1">Analyzing...</h2>
+                        <h3>เมนูยอดฮิตตลอดกาล (หน้าร้าน)</h3>
+                        <h2 id="top-menu-1">กำลังวิเคราะห์...</h2>
                         <p class="trend positive"><i class="fa-solid fa-fire"></i> Best overall rank</p>
                     </div>
                     <div class="kpi-card highlight">
-                        <h3>Rising Star</h3>
-                        <h2 id="top-menu-2">Analyzing...</h2>
-                        <p class="trend positive"><i class="fa-solid fa-arrow-trend-up"></i> Upward trend</p>
+                        <h3>เมนูยอดฮิต (Delivery)</h3>
+                        <h2 id="top-menu-2">กำลังวิเคราะห์...</h2>
+                        <p class="trend positive"><i class="fa-solid fa-motorcycle"></i> High Demand ใน Uber Eats</p>
                     </div>
                 </div>
                 
                 <div class="charts-grid-1">
                     <div class="chart-card">
-                        <h3>Top Menu Popularity Volume (Uber & Dine-in)</h3>
+                        <h3>แนวโน้มเมนูยอดนิยม 3 อันดับแรก (Top 3 Popularity)</h3>
                         <div class="canvas-container large">
                             <canvas id="menuTrendChart"></canvas>
                         </div>
@@ -169,8 +183,8 @@
                     <div class="expert-header">
                         <img src="https://ui-avatars.com/api/?name=AI&background=10b981&color=fff&size=64" alt="AI Analyst" class="avatar">
                         <div>
-                            <h2>Financial & Growth Analysis</h2>
-                            <p>Data-driven insights identifying P&L anomalies, cost spikes, and strategic recommendations.</p>
+                            <h2>บทวิเคราะห์การเงินเชิงลึก (AI Executive Summary)</h2>
+                            <p>ค้นหาจุดเด่น-จุดด้อยเชิงการเงิน รวมถึงสัญญาณเตือนต้นทุน (Red Flags) แบบอัตโนมัติ</p>
                         </div>
                     </div>
                     

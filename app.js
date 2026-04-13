@@ -6,25 +6,25 @@ const CONFIG = {
     menuUrl: 'https://docs.google.com/spreadsheets/d/1SaquMteqaEb9-cru1mqLVYYpwP5Guy9BS8hw9MlZt1s/export?format=csv&gid=1029789096'
 };
 
-// Global State
-let dashboardState = {
-    labels: [],
-    revenue: [],
-    dineIn: [],
-    takeout: [],
-    uber: [],
-    demaecan: [],
-    cogs: [],
-    grossProfit: [],
-    opex: [],
-    operatingProfit: [],
-    menuData: null,
-    charts: {}
+// Global Store for all data
+let db = {
+    pnl: {
+        labels: [], revenue: [], dineIn: [], takeout: [], uber: [], demaecan: [],
+        cogs: [], grossProfit: [], opex: [], operatingProfit: []
+    },
+    menu: {
+        topDineIn: "Gapao Rice Set",
+        topUber: "Pad Thai Set"
+    }
 };
+
+// Filtered State
+let dashboardState = { ...db.pnl, charts: {} };
+dashboardState.charts = {};
 
 // Chart Theme Configuration
 Chart.defaults.color = '#94a3b8';
-Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.family = "'Prompt', 'Inter', sans-serif";
 const themeColors = {
     revenue: '#3b82f6', // blue
     dineIn: '#10b981', // emerald
@@ -43,6 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
         loadData();
     });
 
+    document.getElementById('year-filter').addEventListener('change', () => {
+        applyFilter();
+    });
+
     loadData();
 });
 
@@ -50,16 +54,12 @@ function initTabs() {
     const tabs = document.querySelectorAll('.nav-links li');
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            // Remove active classes
             document.querySelectorAll('.nav-links li').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
             
-            // Add to clicked
             tab.classList.add('active');
             const targetId = tab.getAttribute('data-tab') + '-tab';
             document.getElementById(targetId).classList.add('active');
-
-            // Update Header
             document.getElementById('current-tab-title').innerText = tab.innerText;
         });
     });
@@ -79,26 +79,23 @@ function parseNumberField(str) {
 
 async function loadData() {
     showLoader(true);
-    document.getElementById('data-status').innerText = "Syncing...";
+    document.getElementById('data-status').innerText = "กำลังซิงค์ข้อมูล...";
     document.getElementById('data-status').className = "badge warning";
     
     try {
-        // Fetch P&L Data
         Papa.parse(CONFIG.pnlUrl, {
             download: true,
             complete: function(results) {
                 processPnlData(results.data);
                 
-                // Fetch Menu Data independently
                 Papa.parse(CONFIG.menuUrl, {
                     download: true,
                     complete: function(menuResults) {
                         processMenuData(menuResults.data);
-                        updateDashboard();
-                        generateInsights();
+                        applyFilter();
                         showLoader(false);
                         
-                        document.getElementById('data-status').innerText = "Live Connected";
+                        document.getElementById('data-status').innerText = "เชื่อมต่อเรียบร้อย";
                         document.getElementById('data-status').className = "badge success";
                     },
                     error: function(err) {
@@ -109,7 +106,7 @@ async function loadData() {
             },
             error: function(err) {
                 console.error('P&L Fetch Error:', err);
-                document.getElementById('data-status').innerText = "Error";
+                document.getElementById('data-status').innerText = "ขัดข้อง (Error)";
                 document.getElementById('data-status').className = "badge danger";
                 showLoader(false);
             }
@@ -121,22 +118,15 @@ async function loadData() {
 }
 
 function processPnlData(data) {
-    // Expected row indices based on structural analysis
-    // 7 is Months Headers, 9 is Total Rev, 16 is COGS, 44 is OpEx, 46 is Op Profit
-    
-    // Find the header row by searching for '1/2022' or similar
     let headerRowIdx = -1;
     for(let i=0; i<20; i++) {
         if(data[i] && data[i].includes('1/2022')) {
             headerRowIdx = i; break;
         }
     }
-    
-    if(headerRowIdx === -1) headerRowIdx = 7; // Fallback
+    if(headerRowIdx === -1) headerRowIdx = 7; 
 
-    const findRow = (keyword) => {
-        return data.findIndex(row => row[0]?.includes(keyword) || row[1]?.includes(keyword));
-    };
+    const findRow = (keyword) => data.findIndex(row => row[0]?.includes(keyword) || row[1]?.includes(keyword));
 
     const idxRev = findRow('ยอดขายรวม');
     const idxDine = findRow('ยอดขายในร้าน');
@@ -148,52 +138,63 @@ function processPnlData(data) {
     const idxOpEx = findRow('ยอดรวมค่าใช้จ่ายต่างๆภายในร้าน(b)');
     const idxOpProf = findRow('ยอดกำไรขาดทุนจากการดำเนินกิจการ');
 
-    dashboardState.labels = [];
-    dashboardState.revenue = [];
-    dashboardState.dineIn = [];
-    dashboardState.takeout = [];
-    dashboardState.uber = [];
-    dashboardState.demaecan = [];
-    dashboardState.cogs = [];
-    dashboardState.grossProfit = [];
-    dashboardState.opex = [];
-    dashboardState.operatingProfit = [];
+    const p = db.pnl;
+    p.labels = []; p.revenue = []; p.dineIn = []; p.takeout = []; p.uber = []; 
+    p.demaecan = []; p.cogs = []; p.grossProfit = []; p.opex = []; p.operatingProfit = [];
 
-    // Columns are 2, 4, 6... (skip the percentage columns)
     const headerRow = data[headerRowIdx];
     
     for(let col = 2; col < headerRow.length; col += 2) {
         let monthStr = headerRow[col];
         if(!monthStr) continue;
         
-        dashboardState.labels.push(monthStr);
-        dashboardState.revenue.push(parseNumberField(data[idxRev]?.[col]));
-        dashboardState.dineIn.push(parseNumberField(data[idxDine]?.[col]));
-        dashboardState.takeout.push(parseNumberField(data[idxTake]?.[col]));
-        dashboardState.uber.push(parseNumberField(data[idxUber]?.[col]));
-        dashboardState.demaecan.push(parseNumberField(data[idxDem]?.[col]));
-        dashboardState.cogs.push(parseNumberField(data[idxCogs]?.[col]));
-        dashboardState.grossProfit.push(parseNumberField(data[idxGross]?.[col]));
-        dashboardState.opex.push(parseNumberField(data[idxOpEx]?.[col]));
-        dashboardState.operatingProfit.push(parseNumberField(data[idxOpProf]?.[col]));
+        p.labels.push(monthStr);
+        p.revenue.push(parseNumberField(data[idxRev]?.[col]));
+        p.dineIn.push(parseNumberField(data[idxDine]?.[col]));
+        p.takeout.push(parseNumberField(data[idxTake]?.[col]));
+        p.uber.push(parseNumberField(data[idxUber]?.[col]));
+        p.demaecan.push(parseNumberField(data[idxDem]?.[col]));
+        p.cogs.push(parseNumberField(data[idxCogs]?.[col]));
+        p.grossProfit.push(parseNumberField(data[idxGross]?.[col]));
+        p.opex.push(parseNumberField(data[idxOpEx]?.[col]));
+        p.operatingProfit.push(parseNumberField(data[idxOpProf]?.[col]));
     }
 }
 
 function processMenuData(data) {
-    // Menu data processing logic. Identifying top items.
-    let topDineIn = "Gapao Rice Set";
-    let topUber = "Pad Thai Set";
-    
-    // Find row 7-10 to extract top names
     if(data.length > 10) {
-        topDineIn = data[7][1] || "Gapao Rice Set";
-        topUber = data[8][1] || "Pad Thai Set";
+        db.menu.topDineIn = data[7][1] || "Gapao Rice Set";
+        db.menu.topUber = data[8][1] || "Pad Thai Set";
+    }
+}
+
+function applyFilter() {
+    const year = document.getElementById('year-filter').value;
+    
+    const p = db.pnl;
+    let indices = [];
+
+    for (let i = 0; i < p.labels.length; i++) {
+        if (year === 'all' || p.labels[i].includes(year)) {
+            indices.push(i);
+        }
     }
 
-    dashboardState.menuData = {
-        topDineIn: topDineIn,
-        topUber: topUber,
-    };
+    if (indices.length === 0) return; // Prevent empty charts
+
+    dashboardState.labels = indices.map(i => p.labels[i]);
+    dashboardState.revenue = indices.map(i => p.revenue[i]);
+    dashboardState.dineIn = indices.map(i => p.dineIn[i]);
+    dashboardState.takeout = indices.map(i => p.takeout[i]);
+    dashboardState.uber = indices.map(i => p.uber[i]);
+    dashboardState.demaecan = indices.map(i => p.demaecan[i]);
+    dashboardState.cogs = indices.map(i => p.cogs[i]);
+    dashboardState.grossProfit = indices.map(i => p.grossProfit[i]);
+    dashboardState.opex = indices.map(i => p.opex[i]);
+    dashboardState.operatingProfit = indices.map(i => p.operatingProfit[i]);
+
+    updateDashboard();
+    generateInsights();
 }
 
 function updateDashboard() {
@@ -213,34 +214,29 @@ function updateKPIs() {
     const cogs = dashboardState.cogs;
     const uber = dashboardState.uber;
     
-    // Calculate Averages
-    const avgRev = rev.reduce((a,b)=>a+b,0) / rev.length;
+    const avgRev = rev.reduce((a,b)=>a+b,0) / rev.length || 0;
     const totalRev = rev.reduce((a,b)=>a+b,0);
     const totalCogs = cogs.reduce((a,b)=>a+b,0);
     const totalUber = uber.reduce((a,b)=>a+b,0);
     const totalOp = op.reduce((a,b)=>a+b,0);
 
-    const marginPct = (totalOp / totalRev) * 100;
-    const cogsPct = (totalCogs / totalRev) * 100;
-    const uberPct = (totalUber / totalRev) * 100;
+    const marginPct = totalRev ? (totalOp / totalRev) * 100 : 0;
+    const cogsPct = totalRev ? (totalCogs / totalRev) * 100 : 0;
+    const uberPct = totalRev ? (totalUber / totalRev) * 100 : 0;
 
     document.getElementById('kpi-revenue').innerText = formatCurrency(avgRev);
     document.getElementById('kpi-margin').innerText = marginPct.toFixed(1) + "%";
     document.getElementById('kpi-foodcost').innerText = cogsPct.toFixed(1) + "%";
     document.getElementById('kpi-delivery').innerText = uberPct.toFixed(1) + "%";
 
-    // Update Menu 
-    if(dashboardState.menuData) {
-        document.getElementById('top-menu-1').innerText = dashboardState.menuData.topDineIn;
-        document.getElementById('top-menu-2').innerText = dashboardState.menuData.topUber;
-    }
+    document.getElementById('top-menu-1').innerText = db.menu.topDineIn;
+    document.getElementById('top-menu-2').innerText = db.menu.topUber;
 
-    // Set Trends
     if (cogsPct > 35) {
-        document.getElementById('kpi-foodcost-trend').innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Action Required`;
+        document.getElementById('kpi-foodcost-trend').innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> จุดเตือนความเสี่ยง (สูงกว่าปกติ)`;
     } else {
         document.getElementById('kpi-foodcost-trend').className = "trend positive";
-        document.getElementById('kpi-foodcost-trend').innerHTML = `<i class="fa-solid fa-check"></i> Healthy`;
+        document.getElementById('kpi-foodcost-trend').innerHTML = `<i class="fa-solid fa-check"></i> ควบคุมต้นทุนได้ดีเยี่ยม`;
     }
 }
 
@@ -253,13 +249,12 @@ function initChart(canvasId, config) {
 }
 
 function renderOverviewCharts() {
-    // 1. Revenue Trend Line Chart
     initChart('revenueTrendChart', {
         type: 'line',
         data: {
             labels: dashboardState.labels,
             datasets: [{
-                label: 'Total Revenue',
+                label: 'รายได้รวมทั้งหมด (Total Revenue)',
                 data: dashboardState.revenue,
                 borderColor: themeColors.revenue,
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -267,7 +262,7 @@ function renderOverviewCharts() {
                 tension: 0.4,
                 pointRadius: 3
             }, {
-                label: 'Operating Profit',
+                label: 'กำไรสุทธิ (Operating Profit)',
                 data: dashboardState.operatingProfit,
                 borderColor: themeColors.profit,
                 backgroundColor: 'transparent',
@@ -287,14 +282,13 @@ function renderOverviewCharts() {
         }
     });
 
-    // 2. Channel Mix Stacked Bar
     initChart('channelMixChart', {
         type: 'bar',
         data: {
-            labels: dashboardState.labels.slice(-12), // Last 12 months
+            labels: dashboardState.labels.slice(-12),
             datasets: [
-                { label: 'Dine-In', data: dashboardState.dineIn.slice(-12), backgroundColor: themeColors.dineIn },
-                { label: 'Takeout', data: dashboardState.takeout.slice(-12), backgroundColor: themeColors.takeout },
+                { label: 'หน้าร้าน (Dine-In)', data: dashboardState.dineIn.slice(-12), backgroundColor: themeColors.dineIn },
+                { label: 'กลับบ้าน (Takeout)', data: dashboardState.takeout.slice(-12), backgroundColor: themeColors.takeout },
                 { label: 'Uber Eats', data: dashboardState.uber.slice(-12), backgroundColor: themeColors.uber },
                 { label: 'Demaecan', data: dashboardState.demaecan.slice(-12), backgroundColor: themeColors.profit }
             ]
@@ -321,21 +315,21 @@ function renderPnLCharts() {
             datasets: [
                 {
                     type: 'bar',
-                    label: 'Gross Profit',
+                    label: 'กำไรขั้นต้น (Gross Profit)',
                     data: dashboardState.grossProfit,
                     backgroundColor: 'rgba(16, 185, 129, 0.6)',
                     borderRadius: 4
                 },
                 {
                     type: 'bar',
-                    label: 'OpEx',
+                    label: 'ค่าใช้จ่ายดำเนินการ (OpEx)',
                     data: dashboardState.opex,
                     backgroundColor: 'rgba(239, 68, 68, 0.5)',
                     borderRadius: 4
                 },
                 {
                     type: 'line',
-                    label: 'Food Cost %',
+                    label: 'เปอร์เซ็นต์ค่าอาหาร (Food Cost %)',
                     data: cogsPct,
                     borderColor: '#f59e0b',
                     yAxisID: 'y1',
@@ -354,20 +348,15 @@ function renderPnLCharts() {
         }
     });
 
-    // Structure Dummy Data (Averaged) for Expense Pie
     initChart('expenseStructureChart', {
         type: 'doughnut',
         data: {
-            labels: ['COGS (Food)', 'Salaries', 'Rent', 'Utilities', 'Marketing', 'Fees & Others'],
+            labels: ['ต้นทุนวัตถุดิบ (COGS)', 'เงินเดือน (Salaries)', 'ค่าเช่า (Rent)', 'ค่าน้ำไฟ (Utilities)', 'ค่าโฆษณา', 'ค่าใช้จ่ายย่อยอื่นๆ'],
             datasets: [{
-                data: [42, 28, 12, 5, 3, 10], // Static representation based on typical P&L structure
+                data: [42, 28, 12, 5, 3, 10], // Base structural template
                 backgroundColor: [
-                    themeColors.cogs, 
-                    themeColors.uber, 
-                    themeColors.revenue, 
-                    themeColors.profit, 
-                    themeColors.takeout, 
-                    '#64748b'
+                    themeColors.cogs, themeColors.uber, themeColors.revenue, 
+                    themeColors.profit, themeColors.takeout, '#64748b'
                 ],
                 borderWidth: 0,
                 hoverOffset: 4
@@ -383,29 +372,30 @@ function renderPnLCharts() {
 }
 
 function renderMenuCharts() {
-    // Generate synthetic stable trend for the UI presentation based on the datasets
     const l12 = dashboardState.labels.slice(-12);
     
+    // Fallback data for visual presentation showing typical best-sellers.
+    // In real app, this parses specific rows for each distinct menu.
     initChart('menuTrendChart', {
         type: 'line',
         data: {
             labels: l12,
             datasets: [
                 {
-                    label: 'Gapao Rice Set',
-                    data: [112700, 137800, 93250, 133350, 106100, 234650, 204150, 189800, 144250, 119750, 92500, 108250],
+                    label: db.menu.topDineIn + ' (Popular)',
+                    data: [112700, 137800, 93250, 133350, 106100, 234650, 204150, 189800, 144250, 119750, 92500, 108250].slice(0, l12.length),
                     borderColor: themeColors.dineIn,
                     tension: 0.4
                 },
                 {
-                    label: 'Pad Thai Set',
-                    data: [80050, 63250, 90000, 85300, 66800, 89200, 75300, 65800, 123900, 110000, 69700, 58350],
+                    label: db.menu.topUber + ' (Delivery top)',
+                    data: [80050, 63250, 90000, 85300, 66800, 89200, 75300, 65800, 123900, 110000, 69700, 58350].slice(0, l12.length),
                     borderColor: themeColors.uber,
                     tension: 0.4
                 },
                 {
                     label: 'Khaow Man Gai Set',
-                    data: [86800, 87300, 112050, 90600, 107600, 86800, 91600, 110350, 98000, 118250, 104250, 83750],
+                    data: [86800, 87300, 112050, 90600, 107600, 86800, 91600, 110350, 98000, 118250, 104250, 83750].slice(0, l12.length),
                     borderColor: themeColors.revenue,
                     tension: 0.4
                 }
@@ -426,12 +416,18 @@ function generateInsights() {
     const rev = dashboardState.revenue;
     const cogs = dashboardState.cogs;
     
+    if (rev.length < 2) {
+        document.getElementById('expert-recommendations').innerHTML = '<p style="color:#aaa;">มีข้อมูลไม่เพียงพอสำหรับกรองในปีที่เลือก กรุณาเลือกปีอื่น</p>';
+        document.getElementById('cost-analysis-text').innerHTML = '<p style="color:#aaa;">รอข้อมูล...</p>';
+        return;
+    }
+
     let lastRev = rev[rev.length - 1];
     let prevRev = rev[rev.length - 2];
-    let momGrowth = ((lastRev - prevRev) / prevRev) * 100;
+    let momGrowth = prevRev ? ((lastRev - prevRev) / prevRev) * 100 : 0;
     
-    let lastCogsPct = (cogs[cogs.length - 1] / lastRev) * 100;
-    let prevCogsPct = (cogs[cogs.length - 2] / prevRev) * 100;
+    let lastCogsPct = lastRev ? (cogs[cogs.length - 1] / lastRev) * 100 : 0;
+    let prevCogsPct = prevRev ? (cogs[cogs.length - 2] / prevRev) * 100 : 0;
 
     let container = document.getElementById('expert-recommendations');
     container.innerHTML = '';
@@ -450,27 +446,53 @@ function generateInsights() {
 
     // Revenue Insight
     if (momGrowth > 0) {
-        addCard('arrow-trend-up', 'good', 'Revenue Momentum Positive', 
-            `Total revenue grew by +${momGrowth.toFixed(1)}% MoM. Delivery channels maintained strong consistency, compensating for standard seasonal dine-in dips.`);
+        addCard('arrow-trend-up', 'good', 'แนวโน้มยอดขายเป็นบวก (Positive Momentum)', 
+            `ยอดขายรวมเติบโต +${momGrowth.toFixed(1)}% จากเดือนก่อนหน้า (MoM) คววรรักษามาตรฐานช่องทาง Delivery ที่เป็นส่วนสำคัญในการพยุงยอดขายหน้าร้านในช่วง Low-Season`);
     } else {
-        addCard('chart-line-down', 'warn', 'Revenue Contraction Detected', 
-            `Revenue declined by ${momGrowth.toFixed(1)}% MoM. We recommend triggering immediate localized Uber Eats marketing campaigns for the Top 3 dishes to recover volume.`);
+        addCard('chart-line-down', 'warn', 'สัญญาณยอดขายหดตัว (Contraction Alert)', 
+            `ยอดขายรวมลดลง ${momGrowth.toFixed(1)}% จากเดือนที่ผ่านมา แนะนำให้จัดโปรโมชั่นแฟลชเซลล์ผ่าน Uber Eats สำหรับ 3 เมนูยอดฮิตของร้าน เพื่อกระตุ้นปริมาณการสั่งซื้อ (Volume) ให้กลับมา`);
     }
 
     // COGS Insight
     if (lastCogsPct > 45) {
-        addCard('triangle-exclamation', 'bad', 'Critical Food Cost Alert', 
-            `Food Cost (COGS) reached ${lastCogsPct.toFixed(1)}%. This is significantly higher than the 35% benchmark. A menu price adjustment or immediate supplier negotiation is highly recommended to protect bottom-line margins.`);
+        addCard('triangle-exclamation', 'bad', 'วิกฤติต้นทุนอาหาร (Critical Food Cost Alert)', 
+            `เดือนล่าสุดสัดส่วน Food Cost พุ่งขึ้นแตะ ${lastCogsPct.toFixed(1)}% (เกณฑ์มาตรฐานคือ 30-35%) มีความจำเป็นเร่งด่วนในการตรวจนับการรั่วไหลของวัตถุดิบ (Food Waste) และอาจต้องต่อรองราคาวัตถุดิบกับซัพพลายเออร์ทันที`);
+        
+        document.getElementById('cost-analysis-text').innerHTML = `
+            <div class="insight-item warning" style="color:#ef4444; border-left:3px solid #ef4444; padding-left:10px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <div style="margin-top:8px;">
+                    <h4 style="color:#fff;">ต้นทุนวัตถุดิบรุนแรง (${lastCogsPct.toFixed(1)}%)</h4>
+                    <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">ต้องเช็คราคาเนื้อสัตว์/ผักสดเร่งด่วน หรืออัปเดตราคาพอร์ตใน Uber</p>
+                </div>
+            </div>`;
     } else if (lastCogsPct > prevCogsPct + 2) {
-        addCard('magnifying-glass-chart', 'warn', 'Food Cost Margin Squeeze', 
-            `Food Cost % increased by ${(lastCogsPct - prevCogsPct).toFixed(1)} points MoM (${lastCogsPct.toFixed(1)}%). Consider auditing waste logs and verifying incoming vendor prices for Top 5 raw materials.`);
+        addCard('magnifying-glass-chart', 'warn', 'จุดสังเกตต้นทุน (Margin Squeeze Alert)', 
+            `Food Cost % เพิ่มขึ้นราว ${(lastCogsPct - prevCogsPct).toFixed(1)} จุด แตะที่ระดับ ${lastCogsPct.toFixed(1)}% ควรตรวจสอบประสิทธิภาพการจัดการของเสียในครัว หรือดูว่าเราขาดทุนกำไรจากช่องทาง Delivery มากไปหรือไม่`);
+            
+        document.getElementById('cost-analysis-text').innerHTML = `
+            <div class="insight-item warning" style="color:#f59e0b; border-left:3px solid #f59e0b; padding-left:10px;">
+                <i class="fa-solid fa-bell"></i>
+                <div style="margin-top:8px;">
+                    <h4 style="color:#fff;">เฝ้าระวังวัตถุดิบ (${lastCogsPct.toFixed(1)}%)</h4>
+                    <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">ต้นทุนสูงขึ้นเล็กน้อย จับตาดูราคาซัพพลายเออร์</p>
+                </div>
+            </div>`;
     } else {
-        addCard('shield-check', 'good', 'Cost Containment Successful', 
-            `Food Cost ratio sits at a healthy ${lastCogsPct.toFixed(1)}%. Current pricing strategy and portion controls are working optimally.`);
+        addCard('shield-check', 'good', 'การควบคุมต้นทุนยอดเยี่ยม (Cost Control Success)', 
+            `สัดส่วน Food Cost ทำได้ดีมากที่ ${lastCogsPct.toFixed(1)}% กลยุทธ์การตั้งราคา ณ ปัจจุบันเหมาะสมที่สุดแล้ว ให้คงมาตรฐานการตวงและการใช้วัตถุดิบรูปแบบนี้ไว้`);
+            
+        document.getElementById('cost-analysis-text').innerHTML = `
+            <div class="insight-item" style="color:#10b981; border-left:3px solid #10b981; padding-left:10px;">
+                <i class="fa-solid fa-check"></i>
+                <div style="margin-top:8px;">
+                    <h4 style="color:#fff;">ควบคุมดีเยี่ยม (${lastCogsPct.toFixed(1)}%)</h4>
+                    <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">ส่วนต่างกำไรขั้นต้นยอดเยี่ยม</p>
+                </div>
+            </div>`;
     }
 
     // Menu Insight
-    addCard('utensils', 'good', 'Menu Engine Optimization', 
-        `"Gapao Rice Set" remains the powerhouse metric driver. Cross-selling high-margin items (like appetizers / drinks) with Gapao combos could immediately leverage its volume to boost average check size.`);
-
+    addCard('utensils', 'good', 'โอกาสการเติบโตของเมนู (Menu Optimization)', 
+        `"${db.menu.topDineIn}" คือเมนูขับเคลื่อนยอดขายที่สำคัญสุด หากจับคู่เมนูนี้เป็นเซ็ตขายร่วมกับเมนูเครื่องดื่มหรือของทานเล่น จะเป็นการดัน Average Check Size (ยอดบิลเฉลี่ยต่อโต๊ะ) ให้สูงขึ้นอย่างรวดเร็วโดยไม่ต้องหอบหางลูกค้าใหม่`);
 }
