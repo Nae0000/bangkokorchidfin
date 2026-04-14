@@ -44,9 +44,16 @@ document.addEventListener('DOMContentLoaded', () => {
         loadData();
     });
 
-    document.getElementById('year-filter').addEventListener('change', () => {
+    document.getElementById('year-filter').addEventListener('change', applyFilter);
+    document.getElementById('month-filter').addEventListener('change', applyFilter);
+    
+    document.getElementById('compare-toggle').addEventListener('change', function(e) {
+        document.getElementById('compare-month').disabled = !e.target.checked;
+        document.getElementById('compare-year').disabled = !e.target.checked;
         applyFilter();
     });
+    document.getElementById('compare-month').addEventListener('change', applyFilter);
+    document.getElementById('compare-year').addEventListener('change', applyFilter);
 
     loadData();
 });
@@ -195,35 +202,75 @@ function processMenuData(data) {
     }
 }
 
+function getIndices(year, month) {
+    let res = [];
+    for(let i=0; i<db.pnl.labels.length; i++) {
+        let lab = db.pnl.labels[i];
+        let [m, y] = lab.split('/');
+        let matchY = (year === 'all' || y === year);
+        let matchM = (month === 'all' || m === month);
+        if (matchY && matchM) res.push(i);
+    }
+    return res;
+}
+
+function sumIndices(pArray, indices) {
+    return indices.reduce((sum, idx) => sum + (pArray[idx] || 0), 0);
+}
+
 function applyFilter() {
     const year = document.getElementById('year-filter').value;
+    const month = document.getElementById('month-filter').value;
+    const compareOn = document.getElementById('compare-toggle').checked;
     
     const p = db.pnl;
-    let indices = [];
+    
+    const primaryIndices = getIndices(year, month);
+    if (primaryIndices.length === 0) return;
+    
+    dashboardState.isCompareMode = compareOn;
 
-    for (let i = 0; i < p.labels.length; i++) {
-        if (year === 'all' || p.labels[i].includes(year)) {
-            indices.push(i);
-        }
+    if (!compareOn) {
+        dashboardState.labels = primaryIndices.map(i => p.labels[i]);
+        dashboardState.revenue = primaryIndices.map(i => p.revenue[i]);
+        dashboardState.dineIn = primaryIndices.map(i => p.dineIn[i]);
+        dashboardState.takeout = primaryIndices.map(i => p.takeout[i]);
+        dashboardState.uber = primaryIndices.map(i => p.uber[i]);
+        dashboardState.demaecan = primaryIndices.map(i => p.demaecan[i]);
+        dashboardState.cogs = primaryIndices.map(i => p.cogs[i]);
+        dashboardState.grossProfit = primaryIndices.map(i => p.grossProfit[i]);
+        dashboardState.opex = primaryIndices.map(i => p.opex[i]);
+        dashboardState.operatingProfit = primaryIndices.map(i => p.operatingProfit[i]);
+        dashboardState.salaries = primaryIndices.map(i => p.salaries[i]);
+        dashboardState.rent = primaryIndices.map(i => p.rent[i]);
+        dashboardState.utilities = primaryIndices.map(i => p.utilities[i]);
+        dashboardState.fees = primaryIndices.map(i => p.fees[i]);
+        dashboardState.consumables = primaryIndices.map(i => p.consumables[i]);
+    } else {
+        const cYear = document.getElementById('compare-year').value;
+        const cMonth = document.getElementById('compare-month').value;
+        const compareIndices = getIndices(cYear, cMonth);
+        
+        let labelP = (month==='all' ? 'ทุกเดือน' : 'ด.'+month) + ' ' + (year==='all' ? 'ทุกปี' : year);
+        let labelC = (cMonth==='all' ? 'ทุกเดือน' : 'ด.'+cMonth) + ' ' + (cYear==='all' ? 'ทุกปี' : cYear);
+        if (compareIndices.length === 0) labelC += ' (ไม่มีข้อมูล)';
+
+        dashboardState.labels = [labelC, labelP];
+        dashboardState.revenue = [sumIndices(p.revenue, compareIndices), sumIndices(p.revenue, primaryIndices)];
+        dashboardState.dineIn = [sumIndices(p.dineIn, compareIndices), sumIndices(p.dineIn, primaryIndices)];
+        dashboardState.takeout = [sumIndices(p.takeout, compareIndices), sumIndices(p.takeout, primaryIndices)];
+        dashboardState.uber = [sumIndices(p.uber, compareIndices), sumIndices(p.uber, primaryIndices)];
+        dashboardState.demaecan = [sumIndices(p.demaecan, compareIndices), sumIndices(p.demaecan, primaryIndices)];
+        dashboardState.cogs = [sumIndices(p.cogs, compareIndices), sumIndices(p.cogs, primaryIndices)];
+        dashboardState.grossProfit = [sumIndices(p.grossProfit, compareIndices), sumIndices(p.grossProfit, primaryIndices)];
+        dashboardState.opex = [sumIndices(p.opex, compareIndices), sumIndices(p.opex, primaryIndices)];
+        dashboardState.operatingProfit = [sumIndices(p.operatingProfit, compareIndices), sumIndices(p.operatingProfit, primaryIndices)];
+        dashboardState.salaries = [sumIndices(p.salaries, compareIndices), sumIndices(p.salaries, primaryIndices)];
+        dashboardState.rent = [sumIndices(p.rent, compareIndices), sumIndices(p.rent, primaryIndices)];
+        dashboardState.utilities = [sumIndices(p.utilities, compareIndices), sumIndices(p.utilities, primaryIndices)];
+        dashboardState.fees = [sumIndices(p.fees, compareIndices), sumIndices(p.fees, primaryIndices)];
+        dashboardState.consumables = [sumIndices(p.consumables, compareIndices), sumIndices(p.consumables, primaryIndices)];
     }
-
-    if (indices.length === 0) return; // Prevent empty charts
-
-    dashboardState.labels = indices.map(i => p.labels[i]);
-    dashboardState.revenue = indices.map(i => p.revenue[i]);
-    dashboardState.dineIn = indices.map(i => p.dineIn[i]);
-    dashboardState.takeout = indices.map(i => p.takeout[i]);
-    dashboardState.uber = indices.map(i => p.uber[i]);
-    dashboardState.demaecan = indices.map(i => p.demaecan[i]);
-    dashboardState.cogs = indices.map(i => p.cogs[i]);
-    dashboardState.grossProfit = indices.map(i => p.grossProfit[i]);
-    dashboardState.opex = indices.map(i => p.opex[i]);
-    dashboardState.operatingProfit = indices.map(i => p.operatingProfit[i]);
-    dashboardState.salaries = indices.map(i => p.salaries[i]);
-    dashboardState.rent = indices.map(i => p.rent[i]);
-    dashboardState.utilities = indices.map(i => p.utilities[i]);
-    dashboardState.fees = indices.map(i => p.fees[i]);
-    dashboardState.consumables = indices.map(i => p.consumables[i]);
 
     updateDashboard();
     generateInsights();
@@ -246,11 +293,14 @@ function updateKPIs() {
     const cogs = dashboardState.cogs;
     const uber = dashboardState.uber;
     
-    const avgRev = rev.reduce((a,b)=>a+b,0) / rev.length || 0;
-    const totalRev = rev.reduce((a,b)=>a+b,0);
-    const totalCogs = cogs.reduce((a,b)=>a+b,0);
-    const totalUber = uber.reduce((a,b)=>a+b,0);
-    const totalOp = op.reduce((a,b)=>a+b,0);
+    const isCmp = dashboardState.isCompareMode;
+    const lIdx = rev.length - 1;
+    
+    const avgRev = isCmp ? rev[lIdx] : (rev.reduce((a,b)=>a+b,0) / rev.length || 0);
+    const totalRev = isCmp ? rev[lIdx] : rev.reduce((a,b)=>a+b,0);
+    const totalCogs = isCmp ? cogs[lIdx] : cogs.reduce((a,b)=>a+b,0);
+    const totalUber = isCmp ? uber[lIdx] : uber.reduce((a,b)=>a+b,0);
+    const totalOp = isCmp ? op[lIdx] : op.reduce((a,b)=>a+b,0);
 
     const marginPct = totalRev ? (totalOp / totalRev) * 100 : 0;
     const cogsPct = totalRev ? (totalCogs / totalRev) * 100 : 0;
