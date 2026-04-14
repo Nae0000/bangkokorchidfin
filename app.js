@@ -10,7 +10,8 @@ const CONFIG = {
 let db = {
     pnl: {
         labels: [], revenue: [], dineIn: [], takeout: [], uber: [], demaecan: [],
-        cogs: [], grossProfit: [], opex: [], operatingProfit: []
+        cogs: [], grossProfit: [], opex: [], operatingProfit: [],
+        salaries: [], rent: [], utilities: [], fees: [], consumables: []
     },
     menu: {
         topDineIn: "Gapao Rice Set",
@@ -137,10 +138,19 @@ function processPnlData(data) {
     const idxGross = findRow('ยอดกำไรขาดทุนจากยอดขาย(a)');
     const idxOpEx = findRow('ยอดรวมค่าใช้จ่ายต่างๆภายในร้าน(b)');
     const idxOpProf = findRow('ยอดกำไรขาดทุนจากการดำเนินกิจการ');
+    
+    const idxSalFull = findRow('เงินเดือนพนง.ประจำ');
+    const idxSalPart = findRow('เงินเดือนพนง.พาร์ทไทม์');
+    const idxSalBns = findRow('โบนัส');
+    const idxRent = findRow('ค่าเช่าร้าน');
+    const idxUtil = findRow('ค่าน้ำไฟแก๊ส');
+    const idxFee = findRow('ค่าดำเนินการ');
+    const idxCons = findRow('ค่าของใช้พัสดุต่างๆ');
 
     const p = db.pnl;
     p.labels = []; p.revenue = []; p.dineIn = []; p.takeout = []; p.uber = []; 
     p.demaecan = []; p.cogs = []; p.grossProfit = []; p.opex = []; p.operatingProfit = [];
+    p.salaries = []; p.rent = []; p.utilities = []; p.fees = []; p.consumables = [];
 
     const headerRow = data[headerRowIdx];
     
@@ -158,6 +168,15 @@ function processPnlData(data) {
         p.grossProfit.push(parseNumberField(data[idxGross]?.[col]));
         p.opex.push(parseNumberField(data[idxOpEx]?.[col]));
         p.operatingProfit.push(parseNumberField(data[idxOpProf]?.[col]));
+
+        let salF = parseNumberField(data[idxSalFull]?.[col]);
+        let salP = parseNumberField(data[idxSalPart]?.[col]);
+        let salB = parseNumberField(data[idxSalBns]?.[col]);
+        p.salaries.push(salF + salP + salB);
+        p.rent.push(parseNumberField(data[idxRent]?.[col]));
+        p.utilities.push(parseNumberField(data[idxUtil]?.[col]));
+        p.fees.push(parseNumberField(data[idxFee]?.[col]));
+        p.consumables.push(parseNumberField(data[idxCons]?.[col]));
     }
 }
 
@@ -192,6 +211,11 @@ function applyFilter() {
     dashboardState.grossProfit = indices.map(i => p.grossProfit[i]);
     dashboardState.opex = indices.map(i => p.opex[i]);
     dashboardState.operatingProfit = indices.map(i => p.operatingProfit[i]);
+    dashboardState.salaries = indices.map(i => p.salaries[i]);
+    dashboardState.rent = indices.map(i => p.rent[i]);
+    dashboardState.utilities = indices.map(i => p.utilities[i]);
+    dashboardState.fees = indices.map(i => p.fees[i]);
+    dashboardState.consumables = indices.map(i => p.consumables[i]);
 
     updateDashboard();
     generateInsights();
@@ -415,6 +439,12 @@ function renderMenuCharts() {
 function generateInsights() {
     const rev = dashboardState.revenue;
     const cogs = dashboardState.cogs;
+    const sal = dashboardState.salaries || [];
+    const rent = dashboardState.rent || [];
+    const util = dashboardState.utilities || [];
+    const fees = dashboardState.fees || [];
+    const cons = dashboardState.consumables || [];
+    const op = dashboardState.operatingProfit;
     
     if (rev.length < 2) {
         document.getElementById('expert-recommendations').innerHTML = '<p style="color:#aaa;">มีข้อมูลไม่เพียงพอสำหรับกรองในปีที่เลือก กรุณาเลือกปีอื่น</p>';
@@ -422,77 +452,120 @@ function generateInsights() {
         return;
     }
 
-    let lastRev = rev[rev.length - 1];
-    let prevRev = rev[rev.length - 2];
-    let momGrowth = prevRev ? ((lastRev - prevRev) / prevRev) * 100 : 0;
-    
-    let lastCogsPct = lastRev ? (cogs[cogs.length - 1] / lastRev) * 100 : 0;
-    let prevCogsPct = prevRev ? (cogs[cogs.length - 2] / prevRev) * 100 : 0;
+    let l = rev.length - 1;
+    let p = rev.length - 2;
+
+    const calcGrowth = (curr, prev) => prev ? ((curr - prev) / prev) * 100 : 0;
+    const calcPct = (val, total) => total ? (val / total) * 100 : 0;
+    const fmtRev = (num) => "¥ " + num.toLocaleString(undefined, {maximumFractionDigits:0});
+
+    let revG = calcGrowth(rev[l], rev[p]);
+    let opG = calcGrowth(op[l], op[p]);
 
     let container = document.getElementById('expert-recommendations');
     container.innerHTML = '';
 
-    const addCard = (icon, type, title, desc) => {
+    const addCard = (icon, type, title, desc, details) => {
         container.innerHTML += `
-            <div class="insight-card">
+            <div class="insight-card" style="margin-bottom: 1rem;">
                 <div class="insight-icon insight-${type}"><i class="fa-solid fa-${icon}"></i></div>
-                <div class="insight-text">
+                <div class="insight-text" style="flex:1;">
                     <h4>${title}</h4>
-                    <p>${desc}</p>
+                    <p style="margin-bottom: 8px;">${desc}</p>
+                    <div style="font-size: 0.85rem; color: #cbd5e1; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border-left: 3px solid ${type === 'good' ? '#10b981' : type === 'warn' ? '#f59e0b' : '#ef4444'};">
+                        ${details}
+                    </div>
                 </div>
             </div>
         `;
     };
 
-    // Revenue Insight
-    if (momGrowth > 0) {
-        addCard('arrow-trend-up', 'good', 'แนวโน้มยอดขายเป็นบวก (Positive Momentum)', 
-            `ยอดขายรวมเติบโต +${momGrowth.toFixed(1)}% จากเดือนก่อนหน้า (MoM) คววรรักษามาตรฐานช่องทาง Delivery ที่เป็นส่วนสำคัญในการพยุงยอดขายหน้าร้านในช่วง Low-Season`);
+    // 1. Revenue & Profit
+    if (revG > 0 && opG > 0) {
+        addCard('arrow-trend-up', 'good', 'ผลประกอบการเติบโตยอดเยี่ยม (Quality Growth)',
+            `เดือนล่าสุดยอดขายรวมและกำไรเติบโตพร้อมกัน สะท้อนการจัดการที่มีประสิทธิภาพ`,
+            `ยอดขาย: <b>${fmtRev(rev[l])}</b> (โต ${revG.toFixed(1)}%) | กำไร: <b>${fmtRev(op[l])}</b> (โต ${opG.toFixed(1)}%)<br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องทำ:</b> วิเคราะห์ช่องทางหลักที่ผลักดันยอดขายในเดือนนี้ และอัดงบโปรโมตเพิ่มเติม`);
+    } else if (revG > 0 && opG <= 0) {
+        addCard('scale-unbalanced', 'warn', 'ปัญหาเพิ่มยอดหดกำไร (Growth without Profit)',
+            `ยอดขายเพิ่มขึ้น ${revG.toFixed(1)}% แต่กำไรกลับลดลง ${opG.toFixed(1)}% มีค่าใช้จ่ายส่วนเกินบางอย่างแฝงอยู่`,
+            `<i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องซ่อมแซม:</b> ตรวจสอบต้นทุนค่า GP จากแอปดิลิเวอรี่และค่าจ้างโอทีพนักงานด่วน ว่าถูกใช้งานเกินขอบเขตหรือไม่`);
     } else {
-        addCard('chart-line-down', 'warn', 'สัญญาณยอดขายหดตัว (Contraction Alert)', 
-            `ยอดขายรวมลดลง ${momGrowth.toFixed(1)}% จากเดือนที่ผ่านมา แนะนำให้จัดโปรโมชั่นแฟลชเซลล์ผ่าน Uber Eats สำหรับ 3 เมนูยอดฮิตของร้าน เพื่อกระตุ้นปริมาณการสั่งซื้อ (Volume) ให้กลับมา`);
+        addCard('chart-line-down', 'bad', 'วิกฤตยอดขายหดตัว (Revenue Contraction)',
+            `ยอดขายลดลง ${revG.toFixed(1)}% กระทบต่อโครงสร้างการทำกำไร (Margin) อย่างมาก`,
+            `ยอดขายปัจจุบัน: <b>${fmtRev(rev[l])}</b><br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องซ่อมแซม:</b> จัดโปรโมชั่น Flash-Sale บน Uber Eats สำหรับเมนูขายดี หรือทำเซ็ตจับคู่ (Combo) เพื่อกระตุ้นยอดให้กลับมาเร็วที่สุด`);
     }
 
-    // COGS Insight
-    if (lastCogsPct > 45) {
-        addCard('triangle-exclamation', 'bad', 'วิกฤติต้นทุนอาหาร (Critical Food Cost Alert)', 
-            `เดือนล่าสุดสัดส่วน Food Cost พุ่งขึ้นแตะ ${lastCogsPct.toFixed(1)}% (เกณฑ์มาตรฐานคือ 30-35%) มีความจำเป็นเร่งด่วนในการตรวจนับการรั่วไหลของวัตถุดิบ (Food Waste) และอาจต้องต่อรองราคาวัตถุดิบกับซัพพลายเออร์ทันที`);
-        
+    // 2. Food Cost
+    let cogsPctL = calcPct(cogs[l], rev[l]);
+    let cogsPctP = calcPct(cogs[p], rev[p]);
+    let cogsDiff = cogsPctL - cogsPctP;
+
+    if (cogsPctL > 35) {
+        addCard('basket-shopping', 'bad', `ต้นทุนวัตถุดิบวิกฤต (Target < 35%)`, 
+            `ค่าอาหารกระโดดไปที่ <b>${cogsPctL.toFixed(1)}%</b> ของรายได้ ทำลายกำไรขั้นต้นอย่างหนัก`,
+            `เปอร์เซ็นต์เดือนก่อน: ${cogsPctP.toFixed(1)}% ➡️ เดือนนี้: ${cogsPctL.toFixed(1)}%<br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>วิธีลดต้นทุน & แก้ไข:</b><br>- เช็คราคาจากซัพพลายเออร์เนื้อสัตว์และผักสดทันทีเพื่อต่อรองราคาใหม่<br>- ตรวจสอบสูตรมาตรฐาน (Yield) การรั่วไหล และปริมาณ Food Waste ก้นครัว`);
+            
         document.getElementById('cost-analysis-text').innerHTML = `
             <div class="insight-item warning" style="color:#ef4444; border-left:3px solid #ef4444; padding-left:10px;">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                <div style="margin-top:8px;">
-                    <h4 style="color:#fff;">ต้นทุนวัตถุดิบรุนแรง (${lastCogsPct.toFixed(1)}%)</h4>
-                    <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">ต้องเช็คราคาเนื้อสัตว์/ผักสดเร่งด่วน หรืออัปเดตราคาพอร์ตใน Uber</p>
-                </div>
-            </div>`;
-    } else if (lastCogsPct > prevCogsPct + 2) {
-        addCard('magnifying-glass-chart', 'warn', 'จุดสังเกตต้นทุน (Margin Squeeze Alert)', 
-            `Food Cost % เพิ่มขึ้นราว ${(lastCogsPct - prevCogsPct).toFixed(1)} จุด แตะที่ระดับ ${lastCogsPct.toFixed(1)}% ควรตรวจสอบประสิทธิภาพการจัดการของเสียในครัว หรือดูว่าเราขาดทุนกำไรจากช่องทาง Delivery มากไปหรือไม่`);
+                <i class="fa-solid fa-triangle-exclamation"></i><div style="margin-top:8px;">
+                <h4 style="color:#fff;">Food Cost อันตราย (${cogsPctL.toFixed(1)}%)</h4>
+                <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">ต้นทุนสูงเกิน 35% เช็คขยะอาหารและการชั่งตวงด่วน</p></div></div>`;
+    } else if (cogsDiff > 2) {
+        addCard('bell', 'warn', `ต้นทุนวัตถุดิบมีแนวโน้มขยับขึ้น (Margin Alert)`, 
+            `เปอร์เซ็นต์วัตถุดิบเพิ่มขึ้น <b>${cogsDiff.toFixed(1)}</b> เปอร์เซ็นต์พอยต์ ควบคุมด่วนก่อนกระทบกำไรขั้นต้น`,
+            `<i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>วิธีลดต้นทุน & แก้ไข:</b> ดูว่าเดือนนี้เรามีการจัดโปรโมชั่นลดราคาหน้าร้านเยอะไปหรือไม่ ทำให้ส่วนต่างกำไร/ยอดขายลดลง`);
             
         document.getElementById('cost-analysis-text').innerHTML = `
             <div class="insight-item warning" style="color:#f59e0b; border-left:3px solid #f59e0b; padding-left:10px;">
-                <i class="fa-solid fa-bell"></i>
-                <div style="margin-top:8px;">
-                    <h4 style="color:#fff;">เฝ้าระวังวัตถุดิบ (${lastCogsPct.toFixed(1)}%)</h4>
-                    <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">ต้นทุนสูงขึ้นเล็กน้อย จับตาดูราคาซัพพลายเออร์</p>
-                </div>
-            </div>`;
+                <i class="fa-solid fa-bell"></i><div style="margin-top:8px;">
+                <h4 style="color:#fff;">เฝ้าระวัง Food Cost (${cogsPctL.toFixed(1)}%)</h4>
+                <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">สูงกว่าเดือนก่อน ${cogsDiff.toFixed(1)}% ระมัดระวังโปรโมชั่น</p></div></div>`;
     } else {
-        addCard('shield-check', 'good', 'การควบคุมต้นทุนยอดเยี่ยม (Cost Control Success)', 
-            `สัดส่วน Food Cost ทำได้ดีมากที่ ${lastCogsPct.toFixed(1)}% กลยุทธ์การตั้งราคา ณ ปัจจุบันเหมาะสมที่สุดแล้ว ให้คงมาตรฐานการตวงและการใช้วัตถุดิบรูปแบบนี้ไว้`);
+        addCard('check-circle', 'good', `การควบคุมวัตถุดิบยอดเยี่ยม (Food Cost ${cogsPctL.toFixed(1)}%)`,
+            `รักษาสัดส่วนวัตถุดิบต่อรายได้ได้ดีมาก`,
+            `<i class="fa-solid fa-lightbulb" style="color:#10b981;"></i> รักษามาตรฐานการจัดซื้อและปริมาณแต่ละจานไว้ในระดับนี้`);
             
         document.getElementById('cost-analysis-text').innerHTML = `
             <div class="insight-item" style="color:#10b981; border-left:3px solid #10b981; padding-left:10px;">
-                <i class="fa-solid fa-check"></i>
-                <div style="margin-top:8px;">
-                    <h4 style="color:#fff;">ควบคุมดีเยี่ยม (${lastCogsPct.toFixed(1)}%)</h4>
-                    <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">ส่วนต่างกำไรขั้นต้นยอดเยี่ยม</p>
-                </div>
-            </div>`;
+                <i class="fa-solid fa-check"></i><div style="margin-top:8px;">
+                <h4 style="color:#fff;">ควบคุมเยี่ยม (${cogsPctL.toFixed(1)}%)</h4>
+                <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">กระบวนการทำกำไรขั้นต้นมีเสถียรภาพ</p></div></div>`;
     }
 
-    // Menu Insight
-    addCard('utensils', 'good', 'โอกาสการเติบโตของเมนู (Menu Optimization)', 
-        `"${db.menu.topDineIn}" คือเมนูขับเคลื่อนยอดขายที่สำคัญสุด หากจับคู่เมนูนี้เป็นเซ็ตขายร่วมกับเมนูเครื่องดื่มหรือของทานเล่น จะเป็นการดัน Average Check Size (ยอดบิลเฉลี่ยต่อโต๊ะ) ให้สูงขึ้นอย่างรวดเร็วโดยไม่ต้องหอบหางลูกค้าใหม่`);
+    // 3. Labor Cost
+    let salPctL = calcPct(sal[l], rev[l]);
+    let salPctP = calcPct(sal[p], rev[p]);
+    let salDiff = salPctL - salPctP;
+    
+    if (sal[l] > 0 && salPctL > 25) {
+        addCard('user-clock', 'bad', `ต้นทุนพนักงานล้นระบบ (Labor Cost > 25%)`, 
+            `ค่าจ้างบุคลากรคิดเป็น <b>${salPctL.toFixed(1)}%</b> ของรายได้ ทะลุเกณฑ์มาตรฐานร้านอาหาร (20-25%)`,
+            `ยอดจ่ายเงินเดือนสุทธิ: <b>${fmtRev(sal[l])}</b><br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>วิธีลดต้นทุน & แก้ไข:</b><br>- ปรับตารางพนักงานพาร์ทไทม์ ลดคนออกในช่วงที่ลูกค้าน้อย (Dead hours)<br>- ต้องทำเป้ายอดขายหน้าร้านต่อหัวของพนักงานให้สูงขึ้น`);
+    } else if (sal[l] > 0 && salDiff > 2) {
+        addCard('user-pen', 'warn', `แนวโน้มค่าแรงขยับสูง (Labor Spiking)`, 
+            `เปอร์เซ็นต์ค่าแรงต่อรายได้ขยับสูงขึ้นกว่าเดือนก่อนถึง <b>${salDiff.toFixed(1)}%</b>`,
+            `<i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องซ่อมแซม:</b> ตรวจสอบการทำโอทีล่วงเวลา ว่าสอดคล้องกับพฤติกรรมลูกค้าที่เข้ามาเยอะในช่วงนั้นจริงหรือไม่`);
+    }
+
+    // 4. Platform Fees
+    let feePctL = calcPct(fees[l], rev[l]);
+    if (fees[l] > 0 && feePctL > 15) {
+        addCard('motorcycle', 'warn', `ภาระค่าคอมมิชชั่นแพลตฟอร์ม (Delivery Fees ${feePctL.toFixed(1)}%)`,
+            `โดนหัก GP (ค่าดำเนินการ) สูงถึง <b>${fmtRev(fees[l])}</b> ต่อเดือน`,
+            `<i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>การปรับปรุงแก้ไข:</b><br>- แนะนำให้สร้างเมนูราคาพิเศษทำกำไร (High-margin item) ไว้โชว์เด่นใน Delivery<br>- ใช้กลยุทธ์แถมของเล็กน้อยเพื่อดึงลูกค้าให้มาซื้อตรงกับทางร้านผ่านระบบ Takeout แทนการผ่านแอป`);
+    }
+
+    // 5. Utilities & Consumables Leakages
+    let utilGrowth = calcGrowth(util[l], util[p]);
+    let consGrowth = calcGrowth(cons[l], cons[p]);
+    let overheadText = "";
+    
+    if (util[l] > 0 && utilGrowth > 15) overheadText += `⚡ <b>ค่าน้ำไฟแก๊ส:</b> พุ่งขึ้น ${utilGrowth.toFixed(1)}% (ยอดล่าสุด ${fmtRev(util[l])})<br>`;
+    if (cons[l] > 0 && consGrowth > 15) overheadText += `📦 <b>ค่าบรรจุภัณฑ์/สิ้นเปลือง:</b> ขยับขึ้น ${consGrowth.toFixed(1)}% (ยอดล่าสุด ${fmtRev(cons[l])})`;
+    
+    if (overheadText !== "") {
+        addCard('plug-circle-exclamation', 'warn', `สัญญาณรั่วไหลจากค่าใช้จ่ายคงที่ (Overhead Spike Alert)`, 
+            `พบความผิดปกติของการเบิกจ่ายรายเดือนทะลุเกณฑ์ 15% จากเดือนก่อน`,
+            `${overheadText}<br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องซ่อมแซม:</b><br>- ตรวจสอบว่าแอร์ หรือตู้พ่นความเย็นมีปัญหาทำงานไม่ตัดหรือไม่<br>- เข้มงวดการเบิกใช้ถุง กล่องพลาสติก พนักงานอาจใช้ทิ้งขว้าง ไม่คุ้มค่าใช้จ่าย`);
+    }
 }
