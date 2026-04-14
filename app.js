@@ -44,6 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
         loadData();
     });
 
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        document.getElementById('year-filter').value = 'all';
+        document.getElementById('month-filter').value = 'all';
+        document.getElementById('compare-toggle').checked = false;
+        document.getElementById('compare-month').disabled = true;
+        document.getElementById('compare-year').disabled = true;
+        applyFilter();
+    });
+
     document.getElementById('year-filter').addEventListener('change', applyFilter);
     document.getElementById('month-filter').addEventListener('change', applyFilter);
     
