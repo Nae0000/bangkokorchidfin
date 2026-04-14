@@ -455,7 +455,7 @@ function generateInsights() {
     const op = dashboardState.operatingProfit;
     
     if (rev.length < 2) {
-        document.getElementById('expert-recommendations').innerHTML = '<p style="color:#aaa;">มีข้อมูลไม่เพียงพอสำหรับกรองในปีที่เลือก กรุณาเลือกปีอื่น</p>';
+        document.getElementById('expert-recommendations').innerHTML = '<p style="color:#aaa; text-align:center;">⚠️ ต้องการข้อมูลอย่างน้อย 2 เดือนเพื่อทำการคำนวณ Variance Analysis</p>';
         document.getElementById('cost-analysis-text').innerHTML = '<p style="color:#aaa;">รอข้อมูล...</p>';
         return;
     }
@@ -465,22 +465,26 @@ function generateInsights() {
 
     const calcGrowth = (curr, prev) => prev ? ((curr - prev) / prev) * 100 : 0;
     const calcPct = (val, total) => total ? (val / total) * 100 : 0;
-    const fmtRev = (num) => "¥ " + num.toLocaleString(undefined, {maximumFractionDigits:0});
+    const fmtRev = (num) => "¥" + num.toLocaleString(undefined, {maximumFractionDigits:0});
+    const bps = (curr, prev) => ((curr - prev) * 100).toFixed(0);
 
     let revG = calcGrowth(rev[l], rev[p]);
     let opG = calcGrowth(op[l], op[p]);
+    
+    let opMargL = calcPct(op[l], rev[l]);
+    let opMargP = calcPct(op[p], rev[p]);
 
     let container = document.getElementById('expert-recommendations');
     container.innerHTML = '';
 
     const addCard = (icon, type, title, desc, details) => {
         container.innerHTML += `
-            <div class="insight-card" style="margin-bottom: 1rem;">
-                <div class="insight-icon insight-${type}"><i class="fa-solid fa-${icon}"></i></div>
+            <div class="insight-card" style="margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border: 1px solid rgba(255,255,255,0.05); border-left: 4px solid ${type === 'good' ? '#10b981' : type === 'warn' ? '#f59e0b' : '#ef4444'};">
+                <div class="insight-icon insight-${type}" style="align-self: flex-start; margin-top: 5px;"><i class="fa-solid fa-${icon} fa-lg"></i></div>
                 <div class="insight-text" style="flex:1;">
-                    <h4>${title}</h4>
-                    <p style="margin-bottom: 8px;">${desc}</p>
-                    <div style="font-size: 0.85rem; color: #cbd5e1; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border-left: 3px solid ${type === 'good' ? '#10b981' : type === 'warn' ? '#f59e0b' : '#ef4444'};">
+                    <h4 style="font-size: 1.15rem; font-weight: 600; letter-spacing: -0.025em; color: #f8fafc; margin-bottom: 8px;">${title}</h4>
+                    <p style="margin-bottom: 14px; line-height: 1.6; color: #94a3b8; font-size: 0.95rem;">${desc}</p>
+                    <div style="font-size: 0.9rem; line-height: 1.6; color: #cbd5e1; background: rgba(0,0,0,0.25); padding: 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.02);">
                         ${details}
                     </div>
                 </div>
@@ -488,92 +492,127 @@ function generateInsights() {
         `;
     };
 
-    // 1. Revenue & Profit
-    if (revG > 0 && opG > 0) {
-        addCard('arrow-trend-up', 'good', 'ผลประกอบการเติบโตยอดเยี่ยม (Quality Growth)',
-            `เดือนล่าสุดยอดขายรวมและกำไรเติบโตพร้อมกัน สะท้อนการจัดการที่มีประสิทธิภาพ`,
-            `ยอดขาย: <b>${fmtRev(rev[l])}</b> (โต ${revG.toFixed(1)}%) | กำไร: <b>${fmtRev(op[l])}</b> (โต ${opG.toFixed(1)}%)<br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องทำ:</b> วิเคราะห์ช่องทางหลักที่ผลักดันยอดขายในเดือนนี้ และอัดงบโปรโมตเพิ่มเติม`);
-    } else if (revG > 0 && opG <= 0) {
-        addCard('scale-unbalanced', 'warn', 'ปัญหาเพิ่มยอดหดกำไร (Growth without Profit)',
-            `ยอดขายเพิ่มขึ้น ${revG.toFixed(1)}% แต่กำไรกลับลดลง ${opG.toFixed(1)}% มีค่าใช้จ่ายส่วนเกินบางอย่างแฝงอยู่`,
-            `<i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องซ่อมแซม:</b> ตรวจสอบต้นทุนค่า GP จากแอปดิลิเวอรี่และค่าจ้างโอทีพนักงานด่วน ว่าถูกใช้งานเกินขอบเขตหรือไม่`);
+    // --- 1. Macro-Financial Overview & Profitability (Top-line vs Bottom-line) ---
+    // Calculate Operating Leverage: Degree to which revenue growth translates to operating profit growth
+    let opLev = revG !== 0 ? (opG / revG).toFixed(2) : 'N/A';
+    
+    if (rev[l] > rev[p] && op[l] > op[p]) {
+        addCard('chart-pie', 'good', 'Executive Summary: High-Quality Revenue Growth & Margin Expansion',
+            `องค์กรแสดงศักยภาพการเติบโตที่แข็งแกร่ง (Top-line Expansion) ชดเชยโครงสร้างต้นทุนได้อย่างมีประสิทธิภาพ ยอดขายเติบโต <b>+${revG.toFixed(2)}%</b> และดึงให้กำไรจากการดำเนินงาน (Operating Profit) พุ่งขึ้น <b>+${opG.toFixed(2)}%</b>`,
+            `<b>Financial Diagnostics:</b><br>
+            • อัตรากำไร (Operating Margin) ปรับตัวจาก ${opMargP.toFixed(2)}% เป็น <b>${opMargL.toFixed(2)}%</b> (เพิ่มขึ้น ${bps(opMargL, opMargP)} Basis Points)<br>
+            • Operating Leverage อยู่ที่ระดับ <b>${opLev}x</b> หมายความว่ายอดขายที่เพิ่มขึ้นทุกๆ 1% สามารถสร้างกำไรเพิ่มได้ถึง ${opLev}% บ่งบอกถึงการควบคุม Fixed Cost ได้อย่างหมดจด<br><br>
+            <i class="fa-solid fa-chess-knight" style="color:#10b981;"></i> <b>Strategic Action:</b> 
+            พิจารณาจัดสรรสัดส่วนกำไรส่วนเพิ่ม (Incremental Margin) เพื่อลงทุนปั้นฐานลูกค้าใหม่ (Customer Acquisition) หรือทำแคมเปญเจาะกลุ่ม Premium Tier เพื่อยกระดับ Average Check Size (ยอดบิลเฉลี่ยต่อโต๊ะ) ให้คุ้มศักยภาพการเติบโต`);
+    } else if (rev[l] > rev[p] && op[l] <= op[p]) {
+        addCard('scale-unbalanced', 'warn', 'Executive Summary: Margin Compression (Growth Without Profit)',
+            `เกิดภาวะ <b>Top-Line Vanity</b> หรือยอดขายเติบโตหลอกตาที่ <b>+${revG.toFixed(2)}%</b> แต่กลับเผชิญปัญหากำไรหดตัว <b>${opG.toFixed(2)}%</b> บ่งชี้ชัดเจนว่าโครงสร้างการควบคุมต้นทุนผันแปร (Variable Costs) ล้มเหลว ทำให้ Unit Economics (กำไรต่อหน่วย) เสียหายหนักระดับองค์กร`,
+            `<b>Financial Diagnostics:</b><br>
+            • อัตรากำไรสุทธิร่วงลง ${Math.abs(bps(opMargL, opMargP))} BPS (จาก ${opMargP.toFixed(2)}% สูญสลายเหลือ <b>${opMargL.toFixed(2)}%</b>)<br>
+            • สันนิษฐานเบื้องต้น: ต้นทุนแฝงจากการทำโปรโมชั่นที่ตีราคาผิดพลาด (Mispriced Promotion) หรือระบบแอปเดลิเวอรี่สูบ Margin ไปจนสิ้น<br><br>
+            <i class="fa-solid fa-chess-knight" style="color:#f59e0b;"></i> <b>Strategic Action:</b> 
+            ยุติการทำ Discount Strategy ทันที! เข้าสู่กระบวนการ Cost-Benefit Analysis ตรวจสอบแคมเปญการตลอดโค้งสุดท้าย ว่ามีแคมเปญไหนที่ ROI (ผลตอบแทน) ติดลบ แล้วบังคับใช้มาตรการ "พุชเซลล์เมนู Margin สูง" แทนการเน้น Volume เพียงอย่างเดียว`);
     } else {
-        addCard('chart-line-down', 'bad', 'วิกฤตยอดขายหดตัว (Revenue Contraction)',
-            `ยอดขายลดลง ${revG.toFixed(1)}% กระทบต่อโครงสร้างการทำกำไร (Margin) อย่างมาก`,
-            `ยอดขายปัจจุบัน: <b>${fmtRev(rev[l])}</b><br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องซ่อมแซม:</b> จัดโปรโมชั่น Flash-Sale บน Uber Eats สำหรับเมนูขายดี หรือทำเซ็ตจับคู่ (Combo) เพื่อกระตุ้นยอดให้กลับมาเร็วที่สุด`);
+        addCard('arrow-trend-down', 'bad', 'Executive Summary: Top-Line Contraction & Profitability Crisis',
+            `องค์กรกำลังเผชิญภาวะถดถอยเชิงโครงสร้าง ยอดขายรวมดิ่งลง <b>${revG.toFixed(2)}%</b> ก่อให้เกิดผลกระทบลูกโซ่ทำลายกำไรสุทธิ ปริมาณ Volume ไม่เพียงพอที่จะหล่อเลี้ยง Fixed Cost ของบริษัท`,
+            `<b>Financial Diagnostics:</b><br>
+            • ยอดขายที่ตกลงมาอยู่ที่ <b>${fmtRev(rev[l])}</b> ได้ทำลายโครงสร้าง Economy of Scale แบบฉับพลัน<br><br>
+            <i class="fa-solid fa-chess-knight" style="color:#ef4444;"></i> <b>Strategic Action:</b> 
+            ใช้กลยุทธ์ Survival Mode: 1) ระดมยิงโฆษณาแบบ Direct Response เจาะลูกค้าเก่าด้วยฐานข้อมูลแอปไลน์หรืออีเมล (CRM) เพื่อดึง Cash Flow กลางอากาศ 2) หั่นชั่วโมงการทำงานล่วงเวลา (Overhead Fat) ออกให้ไวที่สุดเพื่อรักษากระแสเงินสด (Liquidity Runway) ให้อยู่รอด`);
     }
 
-    // 2. Food Cost
+    // --- 2. COGS & Supply Chain ---
     let cogsPctL = calcPct(cogs[l], rev[l]);
     let cogsPctP = calcPct(cogs[p], rev[p]);
     let cogsDiff = cogsPctL - cogsPctP;
 
     if (cogsPctL > 35) {
-        addCard('basket-shopping', 'bad', `ต้นทุนวัตถุดิบวิกฤต (Target < 35%)`, 
-            `ค่าอาหารกระโดดไปที่ <b>${cogsPctL.toFixed(1)}%</b> ของรายได้ ทำลายกำไรขั้นต้นอย่างหนัก`,
-            `เปอร์เซ็นต์เดือนก่อน: ${cogsPctP.toFixed(1)}% ➡️ เดือนนี้: ${cogsPctL.toFixed(1)}%<br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>วิธีลดต้นทุน & แก้ไข:</b><br>- เช็คราคาจากซัพพลายเออร์เนื้อสัตว์และผักสดทันทีเพื่อต่อรองราคาใหม่<br>- ตรวจสอบสูตรมาตรฐาน (Yield) การรั่วไหล และปริมาณ Food Waste ก้นครัว`);
+        addCard('triangle-exclamation', 'bad', `Supply Chain Alert: Critical Food Cost Blowout (${cogsPctL.toFixed(2)}%)`, 
+            `โครงสร้างต้นทุนวัตถุดิบทลายแนวต้านมาตรฐาน (Target < 35%) พุ่งกระแทกไปถึง <b>${cogsPctL.toFixed(2)}%</b> ของรายได้ มันกำลังกลืนกินกำไรขั้นต้น (Gross Margin) อย่างรุนแรงและไม่อาจปล่อยผ่านได้แม้แต่วันเดียว`,
+            `<b>Analytical Breakdown:</b><br>
+            • เทียบจากเดือนที่ผ่านมาที่ระดับ ${cogsPctP.toFixed(2)}% หมายถึงเราเสียมาร์จิ้นแบบไร้ความหมายไป ${bps(cogsPctL, cogsPctP)} BPS<br><br>
+            <i class="fa-solid fa-screwdriver-wrench" style="color:#ef4444;"></i> <b>Turnaround Execution:</b><br>
+            1. <b>Vendor Renegotiation:</b> นัดเจรจากับ Supplier เนื้อสัตว์/อาหารทะเลด่วน ล็อกราคาแบบสัญญา (Forward Contracts) เพื่อป้องกันความผันผวนของราคาตลาด<br>
+            2. <b>Yield Engineering:</b> สุ่มตรวจน้ำหนักชั่งตวงก้นครัว (Portion Control Audit) หากพบรอยรั่ว Food Waste ต้องลงทัณฑ์ระบบปฏิบัติการหลังร้านทันที<br>
+            3. <b>Menu Matrix Repricing:</b> ถอดเมนูที่ต้นทุนสูงผิดปกติ (Dogs) ออกจากป้ายไฟเด่น หรือแอบปรับขึ้นราคา (Menu Engineering) 5-8% ภายในสัปดาห์หน้า`);
             
         document.getElementById('cost-analysis-text').innerHTML = `
-            <div class="insight-item warning" style="color:#ef4444; border-left:3px solid #ef4444; padding-left:10px;">
-                <i class="fa-solid fa-triangle-exclamation"></i><div style="margin-top:8px;">
-                <h4 style="color:#fff;">Food Cost อันตราย (${cogsPctL.toFixed(1)}%)</h4>
-                <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">ต้นทุนสูงเกิน 35% เช็คขยะอาหารและการชั่งตวงด่วน</p></div></div>`;
+            <div class="insight-item warning" style="color:#ef4444; border-left:3px solid #ef4444; padding-left:12px; background: rgba(239, 68, 68, 0.05); padding-top:8px; padding-bottom:8px; border-radius:4px;">
+                <i class="fa-solid fa-biohazard"></i><div style="margin-top:4px;">
+                <h4 style="color:#fff; font-size: 1.05rem;">วิกฤติ Supply Chain (${cogsPctL.toFixed(2)}%)</h4>
+                <p style="font-size:0.85rem; color:#cbd5e1; margin-top:5px;">ต้นทุนอาหารกลืนกิน Gross Margin เช็คการตวงและ Waste ด่วน!</p></div></div>`;
     } else if (cogsDiff > 2) {
-        addCard('bell', 'warn', `ต้นทุนวัตถุดิบมีแนวโน้มขยับขึ้น (Margin Alert)`, 
-            `เปอร์เซ็นต์วัตถุดิบเพิ่มขึ้น <b>${cogsDiff.toFixed(1)}</b> เปอร์เซ็นต์พอยต์ ควบคุมด่วนก่อนกระทบกำไรขั้นต้น`,
-            `<i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>วิธีลดต้นทุน & แก้ไข:</b> ดูว่าเดือนนี้เรามีการจัดโปรโมชั่นลดราคาหน้าร้านเยอะไปหรือไม่ ทำให้ส่วนต่างกำไร/ยอดขายลดลง`);
+        addCard('magnifying-glass-chart', 'warn', `Margin Squeeze Warning: Uptrend in COGS (${cogsPctL.toFixed(2)}%)`, 
+            `เตือนความเสี่ยงระดับ 2: แม้ภาพรวมวัตถุดิบยังดูประคองตัวได้ แต่มีทิศทางปรับฐานขึ้นถึง <b>${cogsDiff.toFixed(2)}%</b> ของสัดส่วนยอดขาย นี่คือรอยปริแตกแรกของรอยรั่วด้านต้นทุน (Creeping Inflation)`,
+            `<b>Analytical Breakdown:</b><br>
+            • ระดับความเสี่ยงแฝงนี้มักเกิดจากการทำแคมเปญลดราคาแบบสะเปะสะปะ แจกจนอัตราส่วนยอดขายต่อต้นทุนพังทลาย<br><br>
+            <i class="fa-solid fa-screwdriver-wrench" style="color:#f59e0b;"></i> <b>Turnaround Execution:</b> ตรวจสอบ Campaign Dashboard วิเคราะห์ว่าแคมเปญส่วนลดใดให้ผลตอบแทนต่ำติดดินและยกเลิกทันที พร้อมทำ Menu Mix Analysis บังคับขายเมนูที่ใช้วัตถุดิบราคาถูกแทน`);
             
         document.getElementById('cost-analysis-text').innerHTML = `
-            <div class="insight-item warning" style="color:#f59e0b; border-left:3px solid #f59e0b; padding-left:10px;">
-                <i class="fa-solid fa-bell"></i><div style="margin-top:8px;">
-                <h4 style="color:#fff;">เฝ้าระวัง Food Cost (${cogsPctL.toFixed(1)}%)</h4>
-                <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">สูงกว่าเดือนก่อน ${cogsDiff.toFixed(1)}% ระมัดระวังโปรโมชั่น</p></div></div>`;
+            <div class="insight-item warning" style="color:#f59e0b; border-left:3px solid #f59e0b; padding-left:12px; background: rgba(245, 158, 11, 0.05); padding-top:8px; padding-bottom:8px; border-radius:4px;">
+                <i class="fa-solid fa-radar"></i><div style="margin-top:4px;">
+                <h4 style="color:#fff; font-size: 1.05rem;">จับตาต้นทุนขยับตัว (${cogsPctL.toFixed(2)}%)</h4>
+                <p style="font-size:0.85rem; color:#cbd5e1; margin-top:5px;">COGS มีแนวโน้มพุ่งสูง ระวังโปรโมชั่นล้างผลาญกำไร</p></div></div>`;
     } else {
-        addCard('check-circle', 'good', `การควบคุมวัตถุดิบยอดเยี่ยม (Food Cost ${cogsPctL.toFixed(1)}%)`,
-            `รักษาสัดส่วนวัตถุดิบต่อรายได้ได้ดีมาก`,
-            `<i class="fa-solid fa-lightbulb" style="color:#10b981;"></i> รักษามาตรฐานการจัดซื้อและปริมาณแต่ละจานไว้ในระดับนี้`);
+        addCard('shield-halved', 'good', `Supply Chain Mastery: Flawless COGS Control (${cogsPctL.toFixed(2)}%)`,
+            `การบริหารห่วงโซ่อุปทาน (Supply Chain) สมบูรณ์แบบ สัดส่วนต้นทุนอาหารทำได้อย่างยอดเยี่ยม รักษากำไรขั้นต้นไว้ป้อมปราการเหล็ก`,
+            `<b>Analytical Breakdown:</b><br>
+            • ยืนหยัดอยู่ที่ ${cogsPctL.toFixed(2)}% สะท้อนถึงการเจรจาต่อรองซัพพลายเออร์ที่เหนือชั้น และระบบปฏิบัติการหลังร้าน (Kitchen Ops) ที่ไม่มีที่ติ<br><br>
+            <i class="fa-solid fa-screwdriver-wrench" style="color:#10b981;"></i> <b>Strategic Action:</b> รักษาสูตรมาตรฐาน (SOP) ชุดนี้เป็นคัมภีร์หลัก และอาจลองใช้โมเดล Menu Premiumization อัปเกรดท็อปปิ้งเพื่อดึง Margin ให้ทะลุขีดจำกัดไปอีกขั้น`);
             
         document.getElementById('cost-analysis-text').innerHTML = `
-            <div class="insight-item" style="color:#10b981; border-left:3px solid #10b981; padding-left:10px;">
-                <i class="fa-solid fa-check"></i><div style="margin-top:8px;">
-                <h4 style="color:#fff;">ควบคุมเยี่ยม (${cogsPctL.toFixed(1)}%)</h4>
-                <p style="font-size:0.9rem; color:#aaa; margin-top:5px;">กระบวนการทำกำไรขั้นต้นมีเสถียรภาพ</p></div></div>`;
+            <div class="insight-item" style="color:#10b981; border-left:3px solid #10b981; padding-left:12px; background: rgba(16, 185, 129, 0.05); padding-top:8px; padding-bottom:8px; border-radius:4px;">
+                <i class="fa-solid fa-shield-check"></i><div style="margin-top:4px;">
+                <h4 style="color:#fff; font-size: 1.05rem;">Gross Margin ไร้รอยรั่ว (${cogsPctL.toFixed(2)}%)</h4>
+                <p style="font-size:0.85rem; color:#cbd5e1; margin-top:5px;">บริหารซัพพลายได้ล้ำเลิศ โครงสร้างกำไรขั้นต้นเสถียรมาก</p></div></div>`;
     }
 
-    // 3. Labor Cost
+    // --- 3. Labor & Human Capital ---
     let salPctL = calcPct(sal[l], rev[l]);
     let salPctP = calcPct(sal[p], rev[p]);
     let salDiff = salPctL - salPctP;
     
     if (sal[l] > 0 && salPctL > 25) {
-        addCard('user-clock', 'bad', `ต้นทุนพนักงานล้นระบบ (Labor Cost > 25%)`, 
-            `ค่าจ้างบุคลากรคิดเป็น <b>${salPctL.toFixed(1)}%</b> ของรายได้ ทะลุเกณฑ์มาตรฐานร้านอาหาร (20-25%)`,
-            `ยอดจ่ายเงินเดือนสุทธิ: <b>${fmtRev(sal[l])}</b><br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>วิธีลดต้นทุน & แก้ไข:</b><br>- ปรับตารางพนักงานพาร์ทไทม์ ลดคนออกในช่วงที่ลูกค้าน้อย (Dead hours)<br>- ต้องทำเป้ายอดขายหน้าร้านต่อหัวของพนักงานให้สูงขึ้น`);
+        addCard('users-slash', 'bad', `Human Capital Inefficiency: Labor Cost Overflow (>25%)`, 
+            `ค่าใช้จ่ายบุคลากรต่อยอดขายแตะระดับ <b>${salPctL.toFixed(2)}%</b> (มาตรฐานโลกอุตสาหกรรมร้านอาหารอยู่ที่ 20-25%) นี่คือการ Overstaffing ที่กำลังแทะเล็ม Bottom-line อย่างเงียบๆ`,
+            `<b>Analytical Breakdown:</b><br>
+            • ยอดใช้จ่ายบุคลากรสุทธิ: <b>${fmtRev(sal[l])}</b> บ่งบอกว่าผลิตภาพต่อหัวพนักงาน (Revenue per Employee) กำลังตกต่ำ<br><br>
+            <i class="fa-solid fa-clipboard-check" style="color:#ef4444;"></i> <b>Corrective Measures:</b><br>
+            1. <b>Labor Scheduling Optimization:</b> วิเคราะห์ Heatmap การเข้าร้านของลูกค้า ปาดทิ้งชั่วโมงบุคลากรพาร์ทไทม์ในช่วง Dead-hours ทันทีแบบไร้ข้อพิจารณา<br>
+            2. <b>Performance Target:</b> ตั้งเป้าหมาย KPIs เชิงยอดขายรายบุคคล หากบุคลากรประจำไม่สามารถดึงยอดขายได้ตามเป้า หมายถึงภาระล่วงเวลาต้องถูกเพิกถอน`);
     } else if (sal[l] > 0 && salDiff > 2) {
-        addCard('user-pen', 'warn', `แนวโน้มค่าแรงขยับสูง (Labor Spiking)`, 
-            `เปอร์เซ็นต์ค่าแรงต่อรายได้ขยับสูงขึ้นกว่าเดือนก่อนถึง <b>${salDiff.toFixed(1)}%</b>`,
-            `<i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องซ่อมแซม:</b> ตรวจสอบการทำโอทีล่วงเวลา ว่าสอดคล้องกับพฤติกรรมลูกค้าที่เข้ามาเยอะในช่วงนั้นจริงหรือไม่`);
+        addCard('people-arrows', 'warn', `Operating Friction: Labor Cost Spiking (${salDiff.toFixed(2)}% MoM)`, 
+            `ตรวจพบกราฟค่าตอบแทนบุคลากรกระตุกขึ้นสวนทางกับรายได้ นี่คือสัญญาณเตือนของโครงสร้างกะการทำงาน (Roster Shift) ที่แฝงไปด้วยชั่วโมงที่ไร้ประสิทธิผล`,
+            `<b>Analytical Breakdown:</b><br>
+            • ค่าแรงเบียดกำไรเพิ่มขึ้น ${salDiff.toFixed(2)}% จากเดือนก่อน แสดงว่ามีการจ่าย Overtime ที่ประเมินพลาดไปอย่างมีนัยสำคัญ<br><br>
+            <i class="fa-solid fa-clipboard-check" style="color:#f59e0b;"></i> <b>Corrective Measures:</b> Audit การอนุมัติทำโอทีย้อนหลัง 30 วัน ควบคุมกะการทำงาน (Shift Rosters) อย่างเข้มงวด อนุมัติ OT เฉพาะเคสที่พิสูจน์ได้ว่ามี Traffic แขกล้นร้านจริงๆ เท่านั้น`);
     }
 
-    // 4. Platform Fees
+    // --- 4. Third-Party Platform Economics ---
     let feePctL = calcPct(fees[l], rev[l]);
     if (fees[l] > 0 && feePctL > 15) {
-        addCard('motorcycle', 'warn', `ภาระค่าคอมมิชชั่นแพลตฟอร์ม (Delivery Fees ${feePctL.toFixed(1)}%)`,
-            `โดนหัก GP (ค่าดำเนินการ) สูงถึง <b>${fmtRev(fees[l])}</b> ต่อเดือน`,
-            `<i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>การปรับปรุงแก้ไข:</b><br>- แนะนำให้สร้างเมนูราคาพิเศษทำกำไร (High-margin item) ไว้โชว์เด่นใน Delivery<br>- ใช้กลยุทธ์แถมของเล็กน้อยเพื่อดึงลูกค้าให้มาซื้อตรงกับทางร้านผ่านระบบ Takeout แทนการผ่านแอป`);
+        addCard('hand-holding-dollar', 'warn', `Unit Economics Decay: Over-Reliance on Delivery Platforms`,
+            `โครงสร้างรายได้กำลังบิดเบี้ยวจากการพึ่งพาแพลตฟอร์มที่ค่าธรรมเนียมรุงรัง ค่า GP/Commissions พุ่งทะลวงไปถึง <b>${fmtRev(fees[l])}</b> ชี้ให้เห็นถึงความสูญเสียใน Unit Economics ขั้นรุนแรง`,
+            `<b>Analytical Breakdown:</b><br>
+            • เราจ่ายส่วยให้ Third-party ถึง <b>${feePctL.toFixed(2)}%</b> ของปริมณฑลยอดขาย ธุรกิจกำลังเป็นเบี้ยล่างให้แอปพลิเคชันเดลิเวอรี่<br><br>
+            <i class="fa-solid fa-rocket" style="color:#f59e0b;"></i> <b>Omnichannel Strategy:</b><br>
+            1. <b>Platform Mark-up Tactic:</b> รีแบรนด์ราคาในแอปทั้งหมดด้วยการบวกราคาเชิงกลยุทธ์ (Strategic Pricing Mark-up 15-20%) ให้ต้นทุนค่าส่งถูกกระจายไปหาผู้บริโภค<br>
+            2. <b>Owned Channel Push:</b> หยอดโบรชัวร์และอัดฉีดโปรโมชั่นสำหรับลูกค้าที่มารับหน้าเคาน์เตอร์ (Takeout) แบบลด 10% ซึ่ง Win-Win และ Margin สุทธิกลับมาตกที่ร้านมหาศาล`);
     }
 
-    // 5. Utilities & Consumables Leakages
+    // --- 5. Overhead & Opex Leakages ---
     let utilGrowth = calcGrowth(util[l], util[p]);
     let consGrowth = calcGrowth(cons[l], cons[p]);
     let overheadText = "";
     
-    if (util[l] > 0 && utilGrowth > 15) overheadText += `⚡ <b>ค่าน้ำไฟแก๊ส:</b> พุ่งขึ้น ${utilGrowth.toFixed(1)}% (ยอดล่าสุด ${fmtRev(util[l])})<br>`;
-    if (cons[l] > 0 && consGrowth > 15) overheadText += `📦 <b>ค่าบรรจุภัณฑ์/สิ้นเปลือง:</b> ขยับขึ้น ${consGrowth.toFixed(1)}% (ยอดล่าสุด ${fmtRev(cons[l])})`;
+    if (util[l] > 0 && utilGrowth > 15) overheadText += `⚡ <b>Utilities Explosion (ค่าน้ำ/ไฟ/พลังงาน):</b> ทะยานขึ้น <b>${utilGrowth.toFixed(2)}%</b> (ปิดที่ ${fmtRev(util[l])}) ซึ่งเป็นการเติบโตแบบก้าวกระโดดที่ไร้เหตุผล<br>`;
+    if (cons[l] > 0 && consGrowth > 15) overheadText += `📦 <b>Consumables Leakage (ค่าบรรจุภัณฑ์/กล่อง):</b> อัตราพร่องตัวพรวดขึ้น <b>${consGrowth.toFixed(2)}%</b> (ทะลุยอด ${fmtRev(cons[l])}) ชี้ชัดให้เห็นการเบิกทิ้งเบิกขวางก้นครัว<br>`;
     
     if (overheadText !== "") {
-        addCard('plug-circle-exclamation', 'warn', `สัญญาณรั่วไหลจากค่าใช้จ่ายคงที่ (Overhead Spike Alert)`, 
-            `พบความผิดปกติของการเบิกจ่ายรายเดือนทะลุเกณฑ์ 15% จากเดือนก่อน`,
-            `${overheadText}<br><br><i class="fa-solid fa-lightbulb" style="color:#fcd34d;"></i> <b>สิ่งที่ต้องซ่อมแซม:</b><br>- ตรวจสอบว่าแอร์ หรือตู้พ่นความเย็นมีปัญหาทำงานไม่ตัดหรือไม่<br>- เข้มงวดการเบิกใช้ถุง กล่องพลาสติก พนักงานอาจใช้ทิ้งขว้าง ไม่คุ้มค่าใช้จ่าย`);
+        addCard('bolt', 'bad', `Operating Overhead Spike: Immediate Leakage Investigation Required`, 
+            `ม่านเรดาร์ระบบดักจับการปลิวหายของค่าใช้จ่าย Overhead พบการกระโดดของ Fixed/Variable OpEx เกินเส้น 15% บ่งชี้ถึงการบริหารหลังร้านที่หย่อนยาน`,
+            `${overheadText}<br><br><i class="fa-solid fa-wrench" style="color:#ef4444;"></i> <b>Zero-Based Review:</b><br>
+            - บังคับใช้แผนประหยัดพลังงาน (Energy Audit Protocol) สแกนตู้แช่ เครื่องปรับอากาศ หรือช่องก๊าซรั่วทันที<br>
+            - แต่งตั้งเจ้าหน้าที่เบิกจ่ายกล่องใส่อาหารและของสิ้นเปลือง ห้ามหยิบอิสระเพื่อปิดรูรั่ว (Pilferage Leakage) แบบเด็ดขาด`);
     }
 }
