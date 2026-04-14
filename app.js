@@ -127,7 +127,12 @@ function processPnlData(data) {
     }
     if(headerRowIdx === -1) headerRowIdx = 7; 
 
-    const findRow = (keyword) => data.findIndex(row => row[0]?.includes(keyword) || row[1]?.includes(keyword));
+    const findRow = (keyword) => data.findIndex(row => {
+        let text1 = row[0] || '';
+        let text2 = row[1] || '';
+        return (text1.includes(keyword) || text2.includes(keyword)) && 
+               !text1.includes('[') && !text2.includes('[');
+    });
 
     const idxRev = findRow('ยอดขายรวม');
     const idxDine = findRow('ยอดขายในร้าน');
