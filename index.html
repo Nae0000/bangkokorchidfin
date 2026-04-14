@@ -6,7 +6,7 @@
     <title>Bangkok Orchid - แดชบอร์ดวิเคราะห์งบการเงิน</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=7">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- PapaParse for CSV parsing -->
@@ -50,8 +50,8 @@
                     <h1 id="current-tab-title">ภาพรวมผู้บริหาร</h1>
                     <p id="current-tab-desc">ดัชนีชี้วัดผลงานทางการเงิน (KPIs) และแนวโน้มปัจจุบัน</p>
                 </div>
-                <div class="actions" style="display:flex; flex-direction:column; gap:10px; align-items:flex-end;">
-                    <div style="display:flex; gap:8px; align-items:center;">
+                <div class="actions">
+                    <div class="filter-row">
                         <span style="color:#aaa; font-size:0.9rem;">ช่วงเวลา:</span>
                         <select id="month-filter" class="form-select">
                             <option value="all">ทุกเดือน (All)</option>
@@ -76,11 +76,11 @@
                             <option value="2025">ปี 2025</option>
                             <option value="2026">ปี 2026</option>
                         </select>
-                        <button id="reset-btn" class="btn-secondary" style="margin-left:8px; padding: 6px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; cursor: pointer;"><i class="fa-solid fa-xmark"></i> ล้างค่า</button>
-                        <button id="refresh-btn" class="btn-primary" style="margin-left:4px;"><i class="fa-solid fa-cloud-arrow-down"></i> ซิงค์ชึท</button>
+                        <button id="reset-btn" class="btn-secondary"><i class="fa-solid fa-xmark"></i> ล้างค่า</button>
+                        <button id="refresh-btn" class="btn-primary"><i class="fa-solid fa-cloud-arrow-down"></i> ซิงค์ชึท</button>
                     </div>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <label style="color:#aaa; cursor:pointer; display:flex; align-items:center; gap:4px; font-size:0.9rem;">
+                    <div class="filter-row">
+                        <label class="compare-label">
                             <input type="checkbox" id="compare-toggle"> <i class="fa-solid fa-code-compare"></i> เทียบกับ (Vs)
                         </label>
                         <select id="compare-month" class="form-select" disabled>
@@ -104,7 +104,7 @@
                             <option value="2025">ปี 2025</option>
                             <option value="2026">ปี 2026</option>
                         </select>
-                        <div class="last-updated" style="margin-left:8px;">สถานะ: <span class="badge success" id="data-status">เชื่อมต่อเรียบร้อย</span></div>
+                        <div class="last-updated">สถานะ: <span class="badge success" id="data-status">เชื่อมต่อเรียบร้อย</span></div>
                     </div>
                 </div>
             </header>
@@ -241,6 +241,6 @@
         </main>
     </div>
     
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>
