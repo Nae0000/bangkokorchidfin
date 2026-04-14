@@ -119,13 +119,8 @@ async function loadData() {
 }
 
 function processPnlData(data) {
-    let headerRowIdx = -1;
-    for(let i=0; i<20; i++) {
-        if(data[i] && data[i].includes('1/2022')) {
-            headerRowIdx = i; break;
-        }
-    }
-    if(headerRowIdx === -1) headerRowIdx = 7; 
+    let headerRowIdx = data.findIndex(row => row[0]?.includes('勘定科目') || row[1]?.includes('หัวข้อบัญชี'));
+    if(headerRowIdx === -1) headerRowIdx = 7;
 
     const findRow = (keyword) => data.findIndex(row => {
         let text1 = row[0] || '';
@@ -182,6 +177,14 @@ function processPnlData(data) {
         p.utilities.push(parseNumberField(data[idxUtil]?.[col]));
         p.fees.push(parseNumberField(data[idxFee]?.[col]));
         p.consumables.push(parseNumberField(data[idxCons]?.[col]));
+    }
+    
+    // Trim trailing empty/future months where revenue is 0
+    while (p.revenue.length > 0 && p.revenue[p.revenue.length - 1] === 0) {
+        p.labels.pop(); p.revenue.pop(); p.dineIn.pop(); p.takeout.pop();
+        p.uber.pop(); p.demaecan.pop(); p.cogs.pop(); p.grossProfit.pop();
+        p.opex.pop(); p.operatingProfit.pop(); p.salaries.pop(); p.rent.pop();
+        p.utilities.pop(); p.fees.pop(); p.consumables.pop();
     }
 }
 
